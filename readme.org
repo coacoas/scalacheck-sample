@@ -1,0 +1,105 @@
+* Property-Based Testing
+
+** Why?
+
+From http://blog.jessitron.com/2013/04/property-based-testing-what-is-it.html:
+#+BEGIN_QUOTE
+Property-based tests make statements about the output of your code
+based on the input, and these statements are verified for many
+different possible inputs.
+#+END_QUOTE
+
+Property-based tests let you describe the nature of your code in a way
+that describes the true intent, rather than simply finding the
+solution that works for the values the designer can consider. Note
+that this does not mean that example-based testing is /bad/ - in fact,
+there is a tremendous benefit to example-based testing. So what are
+the advantages of property-based testing as I see them?
+
+*** Describe intrinsic properties
+The property tests tell a story of what is really expected from your
+code when it is executed. The initial developer has to think much
+harder about the code to come up with a set of properties that are
+true /for all cases/, and that /fully describe the results/. However,
+once these are written, they are unlikely to change. This provides a
+static target for your code. 
+
+*** Documentation as code
+In addition to a static target, though, these tests are also fantastic
+descriptions of behavior for the next developer - and remember that
+the next developer very well may be you-in-six-months. 
+
+*** Generated data
+No longer will you be restricted in your tests by just the values that
+/you/ can imagine. You can let the computer come up with values for
+you! This automatically makes you think a bit more about your code as
+you are writing it, because you aren't trying to solve one solution -
+you have to consider /all/ options. The generators tend to be really
+good at picking the corner cases, too, so you can rest assured that
+these values are getting tested just about every test run. 
+
+Given that the data is generated, this means that the generators
+themselves are also documentation: they should fully describe the
+possible /valid/ inputs for your code, whether that code is a simple
+function or a giant integration test. 
+
+** Generators
+*** Base data types
+#+BEGIN_SRC scala
+import org.scalacheck.Gen
+import org.scalacheck.Arbitrary.arbitrary
+#+END_SRC
+
+~org.scalacheck.Gen~ contains instances for simple datatypes, such as
+~String~, ~Int~, and ~Boolean~. Many of these can be created using
+/arbitrary/ instances, which will simply return a value of that type.
+Note that this is not really a random value, as special care has gone
+into the system to return typical corner cases (empty strings, long
+strings, large integer values, negative numbers, etc.) more often than
+other random values. 
+
+*** Custom generators
+`Gen` forms a Monad, so that it may be combined with other values to
+generate new generators. For instance, let's say there's a case class:
+#+BEGIN_SRC scala
+case class JumbleOfStuff[A](i: Int, s: String, d: Double, xs: List[A])
+#+END_SRC
+
+A generator can be constructed in a manner similar to the following: 
+#+BEGIN_SRC scala
+import org.scalacheck.{ Arbitrary, Gen }
+import org.scalacheck.Arbitrary.arbitrary
+
+def JumbleOfStuffGen[A](genA: Gen[A]): Gen[JumbleOfStuff] = for {
+  i  <- arbitrary[Int]
+  s  <- Gen.alfphaNumString
+  d  <- Gen.choose(0.0, Double.MaxValue)
+  xs <- Gen.listOf(genA)
+} yield JumbleOfStuff(i, s, d, xs)
+#+END_SRC
+
+** Shrinking
+One of the most interesting features of property-based testing as
+implemented in most libraries is /shrinking/. What this means is that
+when a failing test is discovered, the test engine will attempt to
+reduce the input data to the smallest possible value that still
+exhibits the failing behavior. For instance, it may try again with
+shorter strings, or smaller numbers (or numbers trending toward zero,
+most likely), or smaller collections, or some other value. It will
+then report the final shrunk value that caused the failure.
+
+Note that this can sometimes backfire, specifically if a shrunk value
+still fails the test, but fails in a different way than the original
+failure. For that reason, sometimes shrinking should be disabled, or
+you may need to create a custom shrinker
+
+*** Custom ~Shrink~
+For ScalaCheck, see [[https://github.com/rickynils/scalacheck/blob/master/doc/UserGuide.md#test-case-minimisation][Test Case Minimisation]]
+
+* Relevant links
+- [[http://scalacheck.org][ScalaCheck]]
+- [[http://www.scalatest.org/user_guide/property_based_testing][Property-based testing in ScalaTest]]
+
+** Property-based testing for other languages
+- [[http://blog.xebia.com/property-based-testing-java-junit-quickcheck-part-1-basics/][JUnit QuickCheck]]
+- [[https://hypothesis.works/][Hypothesis]] (Property-based testing for Python)
